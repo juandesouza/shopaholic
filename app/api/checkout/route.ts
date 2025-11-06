@@ -26,6 +26,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Log key prefix for debugging (without exposing full key)
+    const keyPrefix = process.env.STRIPE_SECRET_KEY.substring(0, 7)
+    console.log('Stripe key prefix:', keyPrefix, 'Length:', process.env.STRIPE_SECRET_KEY.length)
+
     const stripe = getStripeClient()
 
     const body = await request.json()
@@ -71,7 +75,8 @@ export async function POST(request: NextRequest) {
 
     // Create Stripe Checkout Session with Cards and Boleto payment methods
     // Note: Link is removed due to account/region limitations
-    console.log('Creating Stripe checkout session...')
+    console.log('Creating Stripe checkout session with', lineItems.length, 'items')
+    console.log('Origin:', origin)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'boleto'],
       line_items: lineItems,
