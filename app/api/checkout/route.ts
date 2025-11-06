@@ -7,17 +7,28 @@ function getStripeClient() {
     throw new Error('STRIPE_SECRET_KEY is not set')
   }
   
-  // Clean the API key: remove whitespace, quotes, and invalid characters
-  const cleanedKey = process.env.STRIPE_SECRET_KEY
+  // Clean the API key: remove ALL invalid characters for HTTP headers
+  // HTTP headers cannot contain: \r, \n, \t, and certain control characters
+  let cleanedKey = process.env.STRIPE_SECRET_KEY
     .trim()
-    .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-    .replace(/\s/g, '') // Remove all whitespace
-    .replace(/[\r\n]/g, '') // Remove newlines
+    .replace(/^["']+|["']+$/g, '') // Remove surrounding quotes (single or double)
+    .replace(/\s+/g, '') // Remove ALL whitespace (spaces, tabs, etc.)
+    .replace(/[\r\n\t]/g, '') // Remove newlines, carriage returns, tabs
+    .replace(/[^\x20-\x7E]/g, '') // Remove any non-printable ASCII characters
+  
+  // Additional validation
+  if (cleanedKey.length < 20) {
+    throw new Error(`Stripe API key appears to be too short (${cleanedKey.length} chars). Please check your environment variable.`)
+  }
   
   // Validate key format
   if (!cleanedKey.startsWith('sk_test_') && !cleanedKey.startsWith('sk_live_')) {
+    console.error('Invalid Stripe key format. Key starts with:', cleanedKey.substring(0, 10))
     throw new Error('Invalid Stripe API key format. Key must start with sk_test_ or sk_live_')
   }
+  
+  // Log cleaned key info (safe - only first 10 chars)
+  console.log('Cleaned Stripe key prefix:', cleanedKey.substring(0, 10), 'Length:', cleanedKey.length)
   
   return new Stripe(cleanedKey, {
     apiVersion: '2025-10-29.clover',
@@ -38,9 +49,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Log key prefix for debugging (without exposing full key)
-    const keyPrefix = process.env.STRIPE_SECRET_KEY.substring(0, 7)
-    console.log('Stripe key prefix:', keyPrefix, 'Length:', process.env.STRIPE_SECRET_KEY.length)
+    // Log raw key info for debugging (safe - only first 10 chars)
+    const rawKey = process.env.STRIPE_SECRET_KEY || ''
+    console.log('Raw Stripe key prefix:', rawKey.substring(0, 10), 'Raw length:', rawKey.length, 'Has newlines:', rawKey.includes('\n'), 'Has quotes:', rawKey.includes('"') || rawKey.includes("'"))
 
     const stripe = getStripeClient()
 
