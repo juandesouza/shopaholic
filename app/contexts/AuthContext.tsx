@@ -41,9 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     const supabase = createSupabaseBrowserClient()
-    // Use the current origin (works in both dev and production)
+    // Use just the origin (without pathname) for OAuth redirect
+    // This ensures proper redirect after Google authentication
     const redirectTo = typeof window !== 'undefined' 
-      ? `${window.location.origin}${window.location.pathname}`
+      ? window.location.origin
       : process.env.NEXT_PUBLIC_APP_URL || 
         process.env.NEXT_PUBLIC_VERCEL_URL ? 
           `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` :
@@ -53,6 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider: 'google',
       options: {
         redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
     if (error) {

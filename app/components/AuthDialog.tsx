@@ -58,7 +58,10 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
   const handleGoogleAuth = async () => {
     setLoading(true)
     try {
+      // Close dialog before redirecting (Google OAuth will redirect the page)
+      onClose()
       await signInWithGoogle()
+      // Note: After Google OAuth, the page will redirect, so we don't need to handle success here
     } catch (error) {
       let errorMessage = 'Google sign in failed'
       
@@ -85,13 +88,14 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg"
-        >
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 overflow-y-auto" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg my-auto"
+          >
           <button
             onClick={onClose}
             className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:text-foreground"
@@ -201,6 +205,7 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   )
 }

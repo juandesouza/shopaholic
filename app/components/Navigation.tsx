@@ -12,6 +12,8 @@ export function Navigation() {
   const { theme, toggleTheme } = useTheme()
   const { user, signOut } = useAuth()
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
+  
+  // Render AuthDialog at root level using portal-like positioning
 
   const handleSignOut = async () => {
     try {
@@ -103,6 +105,7 @@ export function Navigation() {
           </div>
         </div>
       </div>
+      {/* Render AuthDialog outside nav but controlled by Navigation state */}
       <AuthDialog isOpen={authDialogOpen} onClose={() => setAuthDialogOpen(false)} />
     </nav>
   )
