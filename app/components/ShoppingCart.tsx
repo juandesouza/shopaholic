@@ -163,13 +163,7 @@ export function ShoppingCart() {
       if (url) {
         window.location.href = url
       } else {
-        // Fallback: use Stripe.js to redirect
-        const stripe = await getStripe()
-        if (stripe) {
-          await stripe.redirectToCheckout({ sessionId })
-        } else {
-          throw new Error('Failed to initialize Stripe')
-        }
+        throw new Error('No checkout URL received from server')
       }
     } catch (error) {
       console.error('Checkout error:', error)
