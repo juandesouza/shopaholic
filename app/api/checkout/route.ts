@@ -7,6 +7,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify Stripe secret key is set
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error('STRIPE_SECRET_KEY is not set')
+      return NextResponse.json(
+        { error: 'Stripe configuration error: Secret key is missing' },
+        { status: 500 }
+      )
+    }
+
     const body = await request.json()
     const { items, currency = 'brl', userId } = body
 
@@ -72,8 +81,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sessionId: session.id, url: session.url })
   } catch (error) {
     console.error('Stripe checkout error:', error)
+    
+    // Provide more detailed error messages
+    let errorMessage = 'Failed to create checkout session'
+    if (error instanceof Error) {
+      errorMessage = error.message
+      // Check for specific Stripe errors
+      if (error.message.includes('No such API key')) {
+        errorMessage = 'Stripe API key is invalid. Please check your STRIPE_SECRET_KEY environment variable.'
+      } else if (error.message.includes('Invalid API Key')) {
+        errorMessage = 'Stripe API key is invalid or expired.'
+      } else if (error.message.includes('rate_limit')) {
+        errorMessage = 'Stripe API rate limit exceeded. Please try again in a moment.'
+      } else if (error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
+        errorMessage = 'Unable to connect to Stripe. Please check your internet connection and try again.'
+      }
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create checkout session' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
