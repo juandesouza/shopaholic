@@ -15,27 +15,17 @@ export function createSupabaseServerClient() {
   // For database-only usage without auth, we still pass cookie helpers to keep SSR pattern compatible
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll();
       },
-      set(name: string, value: string, options: any) {
+      setAll(cookiesToSet) {
         try {
-          cookieStore.set({ name, value, ...options });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          );
         } catch {
           // no-op on edge runtimes without writable cookies
         }
-      },
-      remove(name: string, options: any) {
-        try {
-          cookieStore.set({ name, value: '', ...options });
-        } catch {
-          // no-op
-        }
-      },
-    },
-    headers: {
-      get(name: string) {
-        return headerList.get(name) ?? undefined;
       },
     },
   });
