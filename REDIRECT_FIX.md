@@ -19,21 +19,41 @@
 
 ## Important: Supabase Configuration
 
-For Google OAuth to work correctly, you also need to configure the redirect URL in your Supabase dashboard:
+For Google OAuth to work correctly, you need to configure both the **Site URL** and **Redirect URLs** in your Supabase dashboard:
 
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
 2. Select your project
 3. Go to **Authentication** → **URL Configuration**
-4. Add your production URL to **Redirect URLs**:
+
+### Step 1: Update Site URL
+4. In the **Site URL** field (at the top), change from `http://localhost:3000` to your production URL (NO wildcards here, just the base URL):
    ```
    https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app
+   ```
+   **This is the base URL of your application and is critical for OAuth redirects!**
+   
+   **Note:** The Site URL should NOT have wildcards, just the base domain.
+
+### Step 2: Add Redirect URLs
+5. In the **Redirect URLs** section below, add your production URL with wildcard (recommended for Vercel since deployment URLs can change):
+   ```
    https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app/**
    ```
+   
+   **Notes:**
+   - The `/**` wildcard allows all paths under this domain (recommended for flexibility)
+   - You can also use the exact URL without wildcard if preferred
+   - If you have multiple production deployments, you can add each one with wildcards
+   - This is especially useful since Vercel deployment URLs can change with each deployment
+   
 5. Also add your localhost for development (if needed):
    ```
    http://localhost:3000
-   http://localhost:3000/**
    ```
+   
+   **Note:** Vercel deployment URLs change with each deployment. For a permanent solution, consider:
+   - Setting up a custom domain in Vercel
+   - Or updating the redirect URL in Supabase whenever you deploy
 
 ## Testing
 
