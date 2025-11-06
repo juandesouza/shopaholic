@@ -39,6 +39,15 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Get the origin from request headers or use environment variable
+    const origin = request.headers.get('origin') || 
+                   request.headers.get('host') ? 
+                     `https://${request.headers.get('host')}` : 
+                     process.env.NEXT_PUBLIC_APP_URL || 
+                     process.env.VERCEL_URL ? 
+                       `https://${process.env.VERCEL_URL}` : 
+                       'https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app'
+
     // Create Stripe Checkout Session with Cards and Boleto payment methods
     // Note: Link is removed due to account/region limitations
     const session = await stripe.checkout.sessions.create({
@@ -46,8 +55,8 @@ export async function POST(request: NextRequest) {
       line_items: lineItems,
       mode: 'payment',
       currency: currency.toLowerCase(),
-      success_url: `${request.headers.get('origin') || 'http://localhost:3000'}/?success=true`,
-      cancel_url: `${request.headers.get('origin') || 'http://localhost:3000'}/?canceled=true`,
+      success_url: `${origin}/?success=true`,
+      cancel_url: `${origin}/?canceled=true`,
       metadata: {
         items: JSON.stringify(items),
         userId: userId || '', // Store user ID for clearing cart after payment

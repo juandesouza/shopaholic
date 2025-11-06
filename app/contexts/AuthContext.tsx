@@ -41,10 +41,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     const supabase = createSupabaseBrowserClient()
+    // Use the current origin (works in both dev and production)
+    const redirectTo = typeof window !== 'undefined' 
+      ? `${window.location.origin}${window.location.pathname}`
+      : process.env.NEXT_PUBLIC_APP_URL || 
+        process.env.NEXT_PUBLIC_VERCEL_URL ? 
+          `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` :
+          'https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app'
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}`,
+        redirectTo,
       },
     })
     if (error) {
