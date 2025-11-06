@@ -7,7 +7,19 @@ function getStripeClient() {
     throw new Error('STRIPE_SECRET_KEY is not set')
   }
   
-  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+  // Clean the API key: remove whitespace, quotes, and invalid characters
+  const cleanedKey = process.env.STRIPE_SECRET_KEY
+    .trim()
+    .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+    .replace(/\s/g, '') // Remove all whitespace
+    .replace(/[\r\n]/g, '') // Remove newlines
+  
+  // Validate key format
+  if (!cleanedKey.startsWith('sk_test_') && !cleanedKey.startsWith('sk_live_')) {
+    throw new Error('Invalid Stripe API key format. Key must start with sk_test_ or sk_live_')
+  }
+  
+  return new Stripe(cleanedKey, {
     apiVersion: '2025-10-29.clover',
     timeout: 30000, // 30 second timeout
     maxNetworkRetries: 2,
