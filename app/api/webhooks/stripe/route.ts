@@ -5,6 +5,9 @@ import { createClient } from '@supabase/supabase-js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-10-29.clover',
+  timeout: 30000, // 30 second timeout
+  maxNetworkRetries: 2,
+  httpClient: Stripe.createFetchHttpClient(), // Use fetch for better Vercel compatibility
 })
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
