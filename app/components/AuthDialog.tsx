@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, LogIn, UserPlus, X } from 'lucide-react'
 import { Button } from './ui/button'
@@ -84,17 +85,24 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
     }
   }
 
-  if (!isOpen) return null
+  const [mounted, setMounted] = useState(false)
 
-  return (
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
+
+  if (!isOpen || !mounted) return null
+
+  const dialogContent = (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 overflow-y-auto" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg my-auto"
+            className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg my-auto z-[10000]"
           >
           <button
             onClick={onClose}
@@ -208,5 +216,8 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
       )}
     </AnimatePresence>
   )
+
+  // Render dialog using portal to document body to avoid stacking context issues
+  return createPortal(dialogContent, document.body)
 }
 
