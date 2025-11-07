@@ -7,14 +7,13 @@ function getStripeClient() {
     throw new Error('STRIPE_SECRET_KEY is not set')
   }
   
-  // Clean the API key: remove ALL invalid characters for HTTP headers
-  // HTTP headers cannot contain: \r, \n, \t, and certain control characters
+  // Clean the API key: Stripe keys only contain: letters, numbers, underscores, hyphens
+  // Remove EVERYTHING else (quotes, whitespace, newlines, special chars, etc.)
   let cleanedKey = process.env.STRIPE_SECRET_KEY
     .trim()
     .replace(/^["']+|["']+$/g, '') // Remove surrounding quotes (single or double)
-    .replace(/\s+/g, '') // Remove ALL whitespace (spaces, tabs, etc.)
-    .replace(/[\r\n\t]/g, '') // Remove newlines, carriage returns, tabs
-    .replace(/[^\x20-\x7E]/g, '') // Remove any non-printable ASCII characters
+    .replace(/[\s\r\n\t]/g, '') // Remove ALL whitespace, newlines, carriage returns, tabs
+    .replace(/[^a-zA-Z0-9_-]/g, '') // ONLY keep: letters, numbers, underscores, hyphens
   
   // Additional validation
   if (cleanedKey.length < 20) {

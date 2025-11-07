@@ -9,12 +9,13 @@ function getStripeKey(): string {
     throw new Error('STRIPE_SECRET_KEY is not set')
   }
   
-  // Clean the API key: remove whitespace, quotes, and invalid characters
+  // Clean the API key: Stripe keys only contain: letters, numbers, underscores, hyphens
+  // Remove EVERYTHING else (quotes, whitespace, newlines, special chars, etc.)
   const cleanedKey = process.env.STRIPE_SECRET_KEY
     .trim()
-    .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-    .replace(/\s/g, '') // Remove all whitespace
-    .replace(/[\r\n]/g, '') // Remove newlines
+    .replace(/^["']+|["']+$/g, '') // Remove surrounding quotes (single or double)
+    .replace(/[\s\r\n\t]/g, '') // Remove ALL whitespace, newlines, carriage returns, tabs
+    .replace(/[^a-zA-Z0-9_-]/g, '') // ONLY keep: letters, numbers, underscores, hyphens
   
   // Validate key format
   if (!cleanedKey.startsWith('sk_test_') && !cleanedKey.startsWith('sk_live_')) {
