@@ -175,11 +175,12 @@ export async function POST(request: NextRequest) {
                        `https://${process.env.VERCEL_URL}` : 
                        'https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app'
 
-    // Create Stripe Checkout Session with Cards and Boleto payment methods
-    // Note: Link is removed due to account/region limitations
+    // Create Stripe Checkout Session directly using fetch API to avoid SDK HTTP client issues
+    // This ensures we have full control over the Authorization header
     console.log('Creating Stripe checkout session with', lineItems.length, 'items')
     console.log('Origin:', origin)
-    const session = await stripe.checkout.sessions.create({
+    
+    const checkoutSessionData = {
       payment_method_types: ['card', 'boleto'],
       line_items: lineItems,
       mode: 'payment',
@@ -188,16 +189,81 @@ export async function POST(request: NextRequest) {
       cancel_url: `${origin}/?canceled=true`,
       metadata: {
         items: JSON.stringify(items),
-        userId: userId || '', // Store user ID for clearing cart after payment
+        userId: userId || '',
       },
-      // For Boleto: allow delayed payment confirmation
       payment_method_options: {
         boleto: {
-          expires_after_days: 3, // Boleto expires after 3 days
+          expires_after_days: 3,
         },
       },
+    }
+    
+    // Make direct API call to Stripe using fetch
+    const stripeResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${cleanedKey}`, // Use cleaned key directly
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Stripe-Version': '2025-10-29.clover',
+      },
+      body: new URLSearchParams({
+        ...Object.entries(checkoutSessionData).reduce((acc, [key, value]) => {
+          if (value === null || value === undefined) return acc
+          if (typeof value === 'object' && !Array.isArray(value)) {
+            // Handle nested objects like metadata and payment_method_options
+            if (key === 'metadata') {
+              Object.entries(value as Record<string, string>).forEach(([k, v]) => {
+                acc[`metadata[${k}]`] = v
+              })
+            } else if (key === 'payment_method_options') {
+              Object.entries(value as Record<string, any>).forEach(([k, v]) => {
+                if (typeof v === 'object') {
+                  Object.entries(v).forEach(([k2, v2]) => {
+                    acc[`payment_method_options[${k}][${k2}]`] = String(v2)
+                  })
+                }
+              })
+            }
+          } else if (Array.isArray(value)) {
+            // Handle arrays like payment_method_types and line_items
+            if (key === 'payment_method_types') {
+              value.forEach((v, i) => {
+                acc[`payment_method_types[${i}]`] = v
+              })
+            } else if (key === 'line_items') {
+              value.forEach((item: any, i: number) => {
+                Object.entries(item).forEach(([k, v]) => {
+                  if (typeof v === 'object' && v !== null) {
+                    Object.entries(v).forEach(([k2, v2]) => {
+                      if (typeof v2 === 'object' && v2 !== null) {
+                        Object.entries(v2).forEach(([k3, v3]) => {
+                          acc[`line_items[${i}][${k}][${k2}][${k3}]`] = String(v3)
+                        })
+                      } else {
+                        acc[`line_items[${i}][${k}][${k2}]`] = String(v2)
+                      }
+                    })
+                  } else {
+                    acc[`line_items[${i}][${k}]`] = String(v)
+                  }
+                })
+              })
+            }
+          } else {
+            acc[key] = String(value)
+          }
+          return acc
+        }, {} as Record<string, string>),
+      }),
     })
-
+    
+    if (!stripeResponse.ok) {
+      const errorText = await stripeResponse.text()
+      console.error('Stripe API error:', errorText)
+      throw new Error(`Stripe API error: ${stripeResponse.status} ${stripeResponse.statusText}`)
+    }
+    
+    const session = await stripeResponse.json()
     return NextResponse.json({ sessionId: session.id, url: session.url })
   } catch (error) {
     console.error('Stripe checkout error:', error)
