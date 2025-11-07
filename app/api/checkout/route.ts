@@ -32,56 +32,43 @@ function cleanStripeKey(rawKey: string): string {
   return cleanedKey
 }
 
-// Initialize Stripe client inside the function to avoid module-level issues
-function getStripeClient(cleanedKey: string) {
-  // Validate key one more time - ensure it's absolutely clean
-  // Check every character is valid for HTTP headers (no control chars, no newlines, etc.)
-  for (let i = 0; i < cleanedKey.length; i++) {
-    const char = cleanedKey[i]
-    const charCode = char.charCodeAt(0)
-    // HTTP header values cannot contain: control chars (0-31), DEL (127), or certain other chars
-    if (charCode < 32 || charCode === 127) {
-      throw new Error(`Invalid character at position ${i} in Stripe key: char code ${charCode}`)
-    }
+// Create Stripe client with cleaned key
+// We create it fresh each time to avoid any caching issues
+function getStripeClient(cleanedKey: string): Stripe {
+  // Final validation: ensure key contains ONLY valid characters for HTTP Authorization header
+  // Valid characters: letters, numbers, underscores, hyphens, and the colon (for Basic Auth format)
+  // But Stripe keys don't use colons, so we only allow: a-z, A-Z, 0-9, _, -
+  const validKeyPattern = /^[a-zA-Z0-9_-]+$/
+  if (!validKeyPattern.test(cleanedKey)) {
+    const invalidChars = cleanedKey.split('').filter(c => !/[a-zA-Z0-9_-]/.test(c))
+    throw new Error(`Stripe key contains invalid characters: ${invalidChars.join(', ')}`)
   }
   
-  // Completely remove the environment variable to force Stripe to use the passed key
-  const originalKey = process.env.STRIPE_SECRET_KEY
-  delete process.env.STRIPE_SECRET_KEY
+  // Log the key format for debugging (safe - only first 12 chars)
+  console.log('Creating Stripe client with key prefix:', cleanedKey.substring(0, 12), 'Length:', cleanedKey.length)
+  
+  // Create Stripe client - explicitly pass the key (don't rely on env var)
+  // The SDK should use the passed key, but we'll also ensure env var is set to cleaned version
+  const originalEnvKey = process.env.STRIPE_SECRET_KEY
+  process.env.STRIPE_SECRET_KEY = cleanedKey
   
   try {
-    // Create Stripe client with cleaned key ONLY (no env var fallback)
-    // Try with fetch HTTP client first, but if that doesn't work, fall back to default
-    let stripe: Stripe
-    try {
-      // Attempt to use fetch HTTP client
-      stripe = new Stripe(cleanedKey, {
-        apiVersion: '2025-10-29.clover',
-        timeout: 30000,
-        maxNetworkRetries: 2,
-        httpClient: Stripe.createFetchHttpClient(),
-      })
-    } catch (fetchError) {
-      // If fetch client fails, try without it (use default Node HTTP client)
-      console.warn('Fetch HTTP client failed, using default:', fetchError)
-      stripe = new Stripe(cleanedKey, {
-        apiVersion: '2025-10-29.clover',
-        timeout: 30000,
-        maxNetworkRetries: 2,
-      })
-    }
-    
-    // Set the key back in env for any SDK internal checks, but use cleaned version
-    process.env.STRIPE_SECRET_KEY = cleanedKey
+    // Create client with fetch HTTP client for Vercel compatibility
+    const stripe = new Stripe(cleanedKey, {
+      apiVersion: '2025-10-29.clover',
+      timeout: 30000,
+      maxNetworkRetries: 2,
+      httpClient: Stripe.createFetchHttpClient(),
+    })
     
     return stripe
   } catch (error) {
-    console.error('Error creating Stripe client:', error)
+    console.error('Failed to create Stripe client:', error)
     throw error
   } finally {
-    // Restore original key
-    if (originalKey !== undefined) {
-      process.env.STRIPE_SECRET_KEY = originalKey
+    // Restore original env var
+    if (originalEnvKey !== undefined) {
+      process.env.STRIPE_SECRET_KEY = originalEnvKey
     } else {
       delete process.env.STRIPE_SECRET_KEY
     }
