@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
-// Initialize Stripe client inside the function to avoid module-level issues
-function getStripeClient() {
-  if (!process.env.STRIPE_SECRET_KEY) {
+// Clean and validate Stripe API key - must be called before creating Stripe client
+function cleanStripeKey(rawKey: string): string {
+  if (!rawKey) {
     throw new Error('STRIPE_SECRET_KEY is not set')
   }
   
   // Clean the API key: Stripe keys only contain: letters, numbers, underscores, hyphens
   // Remove EVERYTHING else (quotes, whitespace, newlines, special chars, etc.)
-  let cleanedKey = process.env.STRIPE_SECRET_KEY
+  let cleanedKey = rawKey
     .trim()
     .replace(/^["']+|["']+$/g, '') // Remove surrounding quotes (single or double)
     .replace(/[\s\r\n\t]/g, '') // Remove ALL whitespace, newlines, carriage returns, tabs
@@ -29,12 +29,23 @@ function getStripeClient() {
   // Log cleaned key info (safe - only first 10 chars)
   console.log('Cleaned Stripe key prefix:', cleanedKey.substring(0, 10), 'Length:', cleanedKey.length)
   
-  return new Stripe(cleanedKey, {
+  return cleanedKey
+}
+
+// Initialize Stripe client inside the function to avoid module-level issues
+function getStripeClient() {
+  const rawKey = process.env.STRIPE_SECRET_KEY
+  const cleanedKey = cleanStripeKey(rawKey || '')
+  
+  // Create Stripe client with cleaned key and fetch-based HTTP client
+  const stripe = new Stripe(cleanedKey, {
     apiVersion: '2025-10-29.clover',
     timeout: 30000, // 30 second timeout
     maxNetworkRetries: 2,
     httpClient: Stripe.createFetchHttpClient(), // Use fetch for better Vercel compatibility
   })
+  
+  return stripe
 }
 
 export async function POST(request: NextRequest) {
