@@ -4,14 +4,14 @@ import { headers } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 
 // Clean and validate Stripe API key
-function getStripeKey(): string {
-  if (!process.env.STRIPE_SECRET_KEY) {
+function cleanStripeKey(rawKey: string): string {
+  if (!rawKey) {
     throw new Error('STRIPE_SECRET_KEY is not set')
   }
   
   // Clean the API key: Stripe keys only contain: letters, numbers, underscores, hyphens
   // Remove EVERYTHING else (quotes, whitespace, newlines, special chars, etc.)
-  const cleanedKey = process.env.STRIPE_SECRET_KEY
+  let cleanedKey = rawKey
     .trim()
     .replace(/^["']+|["']+$/g, '') // Remove surrounding quotes (single or double)
     .replace(/[\s\r\n\t]/g, '') // Remove ALL whitespace, newlines, carriage returns, tabs
@@ -25,12 +25,27 @@ function getStripeKey(): string {
   return cleanedKey
 }
 
-const stripe = new Stripe(getStripeKey(), {
-  apiVersion: '2025-10-29.clover',
-  timeout: 30000, // 30 second timeout
-  maxNetworkRetries: 2,
-  httpClient: Stripe.createFetchHttpClient(), // Use fetch for better Vercel compatibility
-})
+// Initialize Stripe client - clean key and override env var to ensure SDK uses it
+function getStripeClient() {
+  const rawKey = process.env.STRIPE_SECRET_KEY || ''
+  const cleanedKey = cleanStripeKey(rawKey)
+  
+  // Override environment variable with cleaned key to ensure Stripe SDK uses it
+  process.env.STRIPE_SECRET_KEY = cleanedKey
+  
+  // Create Stripe client with cleaned key and fetch-based HTTP client
+  const stripe = new Stripe(cleanedKey, {
+    apiVersion: '2025-10-29.clover',
+    timeout: 30000, // 30 second timeout
+    maxNetworkRetries: 2,
+    httpClient: Stripe.createFetchHttpClient(), // Use fetch for better Vercel compatibility
+  })
+  
+  return stripe
+}
+
+// Create Stripe client at module level (will be initialized on first import)
+const stripe = getStripeClient()
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
