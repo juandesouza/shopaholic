@@ -61,7 +61,25 @@ export async function POST(request: NextRequest) {
 
     // Log raw key info for debugging (safe - only first 10 chars)
     const rawKey = process.env.STRIPE_SECRET_KEY || ''
-    console.log('Raw Stripe key prefix:', rawKey.substring(0, 10), 'Raw length:', rawKey.length, 'Has newlines:', rawKey.includes('\n'), 'Has quotes:', rawKey.includes('"') || rawKey.includes("'"))
+    const hasNewlines = rawKey.includes('\n') || rawKey.includes('\r')
+    const hasQuotes = rawKey.includes('"') || rawKey.includes("'")
+    const hasSpaces = rawKey.includes(' ')
+    const hasInvalidChars = /[^a-zA-Z0-9_-]/.test(rawKey.replace(/^["']+|["']+$/g, '').replace(/[\s\r\n\t]/g, ''))
+    
+    console.log('=== STRIPE KEY DEBUG ===')
+    console.log('Raw key prefix:', rawKey.substring(0, 10))
+    console.log('Raw key length:', rawKey.length)
+    console.log('Has newlines:', hasNewlines)
+    console.log('Has quotes:', hasQuotes)
+    console.log('Has spaces:', hasSpaces)
+    console.log('Has invalid chars:', hasInvalidChars)
+    
+    // Clean and validate the key BEFORE creating Stripe client
+    const cleanedKey = cleanStripeKey(rawKey)
+    console.log('Cleaned key prefix:', cleanedKey.substring(0, 10))
+    console.log('Cleaned key length:', cleanedKey.length)
+    console.log('Cleaned key is valid:', cleanedKey.startsWith('sk_test_') || cleanedKey.startsWith('sk_live_'))
+    console.log('========================')
 
     const stripe = getStripeClient()
 
