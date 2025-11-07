@@ -18,8 +18,12 @@ export function Navigation() {
   const handleSignOut = async () => {
     try {
       await signOut()
+      // Force page reload to ensure state is cleared
+      window.location.reload()
     } catch (error) {
       console.error('Error signing out:', error)
+      // Still reload even on error to clear any stale state
+      window.location.reload()
     }
   }
 

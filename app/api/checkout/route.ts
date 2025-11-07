@@ -34,23 +34,39 @@ function cleanStripeKey(rawKey: string): string {
 
 // Initialize Stripe client inside the function to avoid module-level issues
 function getStripeClient(cleanedKey: string) {
-  // Temporarily override the environment variable with the cleaned key
-  // This ensures Stripe SDK uses only the cleaned key, not the raw one
+  // Validate key one more time - ensure it's absolutely clean
+  // Check every character is valid for HTTP headers (no control chars, no newlines, etc.)
+  for (let i = 0; i < cleanedKey.length; i++) {
+    const char = cleanedKey[i]
+    const charCode = char.charCodeAt(0)
+    // HTTP header values cannot contain: control chars (0-31), DEL (127), or certain other chars
+    if (charCode < 32 || charCode === 127) {
+      throw new Error(`Invalid character at position ${i} in Stripe key: char code ${charCode}`)
+    }
+  }
+  
+  // Override environment variable BEFORE creating Stripe client
+  // This ensures Stripe SDK uses only the cleaned key
   const originalKey = process.env.STRIPE_SECRET_KEY
   process.env.STRIPE_SECRET_KEY = cleanedKey
   
   try {
-    // Create Stripe client with cleaned key and fetch-based HTTP client
+    // Create Stripe client with cleaned key
+    // Note: We explicitly pass the key to avoid any env var reading
     const stripe = new Stripe(cleanedKey, {
       apiVersion: '2025-10-29.clover',
-      timeout: 30000, // 30 second timeout
+      timeout: 30000,
       maxNetworkRetries: 2,
-      httpClient: Stripe.createFetchHttpClient(), // Use fetch for better Vercel compatibility
+      // Use fetch HTTP client for Vercel compatibility
+      httpClient: Stripe.createFetchHttpClient(),
     })
     
     return stripe
+  } catch (error) {
+    console.error('Error creating Stripe client:', error)
+    throw error
   } finally {
-    // Restore original key (though we'll override it again on next call)
+    // Restore original key
     if (originalKey !== undefined) {
       process.env.STRIPE_SECRET_KEY = originalKey
     }
@@ -89,16 +105,24 @@ export async function POST(request: NextRequest) {
     console.log('Cleaned key length:', cleanedKey.length)
     console.log('Cleaned key is valid:', cleanedKey.startsWith('sk_test_') || cleanedKey.startsWith('sk_live_'))
     
+    // Additional validation: check for any control characters or invalid HTTP header chars
+    const invalidChars = cleanedKey.match(/[\x00-\x1F\x7F]/)
+    if (invalidChars) {
+      console.error('Found invalid characters in cleaned key:', invalidChars)
+      throw new Error('Cleaned Stripe key contains invalid characters for HTTP headers')
+    }
+    
     // Verify cleaned key has no invalid characters for HTTP headers
-    const hasInvalidHeaderChars = /[\r\n\t]/.test(cleanedKey)
+    const hasInvalidHeaderChars = /[\r\n\t\x00-\x1F\x7F]/.test(cleanedKey)
     console.log('Cleaned key has invalid header chars:', hasInvalidHeaderChars)
+    console.log('Key character codes (first 20):', Array.from(cleanedKey.substring(0, 20)).map(c => c.charCodeAt(0)).join(','))
     console.log('========================')
     
     if (hasInvalidHeaderChars) {
       throw new Error('Cleaned Stripe key still contains invalid characters for HTTP headers')
     }
 
-    // Override environment variable with cleaned key to ensure Stripe SDK uses it
+    // Override environment variable with cleaned key BEFORE creating client
     process.env.STRIPE_SECRET_KEY = cleanedKey
     
     const stripe = getStripeClient(cleanedKey)
