@@ -97,12 +97,33 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
   const dialogContent = (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflowY: 'auto'
+          }}
+          onClick={(e) => {
+            // Close dialog when clicking on backdrop
+            if (e.target === e.currentTarget) {
+              onClose()
+            }
+          }}
+        >
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg my-auto z-[10000]"
+            className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg z-[10000]"
+            style={{ margin: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
           >
           <button
             onClick={onClose}
