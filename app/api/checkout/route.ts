@@ -45,21 +45,34 @@ function getStripeClient(cleanedKey: string) {
     }
   }
   
-  // Override environment variable BEFORE creating Stripe client
-  // This ensures Stripe SDK uses only the cleaned key
+  // Completely remove the environment variable to force Stripe to use the passed key
   const originalKey = process.env.STRIPE_SECRET_KEY
-  process.env.STRIPE_SECRET_KEY = cleanedKey
+  delete process.env.STRIPE_SECRET_KEY
   
   try {
-    // Create Stripe client with cleaned key
-    // Note: We explicitly pass the key to avoid any env var reading
-    const stripe = new Stripe(cleanedKey, {
-      apiVersion: '2025-10-29.clover',
-      timeout: 30000,
-      maxNetworkRetries: 2,
-      // Use fetch HTTP client for Vercel compatibility
-      httpClient: Stripe.createFetchHttpClient(),
-    })
+    // Create Stripe client with cleaned key ONLY (no env var fallback)
+    // Try with fetch HTTP client first, but if that doesn't work, fall back to default
+    let stripe: Stripe
+    try {
+      // Attempt to use fetch HTTP client
+      stripe = new Stripe(cleanedKey, {
+        apiVersion: '2025-10-29.clover',
+        timeout: 30000,
+        maxNetworkRetries: 2,
+        httpClient: Stripe.createFetchHttpClient(),
+      })
+    } catch (fetchError) {
+      // If fetch client fails, try without it (use default Node HTTP client)
+      console.warn('Fetch HTTP client failed, using default:', fetchError)
+      stripe = new Stripe(cleanedKey, {
+        apiVersion: '2025-10-29.clover',
+        timeout: 30000,
+        maxNetworkRetries: 2,
+      })
+    }
+    
+    // Set the key back in env for any SDK internal checks, but use cleaned version
+    process.env.STRIPE_SECRET_KEY = cleanedKey
     
     return stripe
   } catch (error) {
@@ -69,6 +82,8 @@ function getStripeClient(cleanedKey: string) {
     // Restore original key
     if (originalKey !== undefined) {
       process.env.STRIPE_SECRET_KEY = originalKey
+    } else {
+      delete process.env.STRIPE_SECRET_KEY
     }
   }
 }

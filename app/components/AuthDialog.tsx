@@ -91,6 +91,14 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
     setMounted(true)
     return () => setMounted(false)
   }, [])
+  
+  // Close dialog if user becomes authenticated (e.g., after OAuth redirect)
+  const { user } = useAuth()
+  useEffect(() => {
+    if (user && isOpen) {
+      onClose()
+    }
+  }, [user, isOpen, onClose])
 
   if (!isOpen || !mounted) return null
 

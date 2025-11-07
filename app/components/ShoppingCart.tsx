@@ -80,26 +80,34 @@ export function ShoppingCart() {
 
   // Listen for custom events when lists are saved or deleted
   useEffect(() => {
-    const handleListSaved = () => {
+    const handleListSaved = async () => {
       if (user) {
-        refetch()
+        await refetch()
       }
     }
 
     window.addEventListener('shoppingListSaved', handleListSaved)
     return () => window.removeEventListener('shoppingListSaved', handleListSaved)
   }, [user, refetch])
+  
+  // Also refetch when user changes (e.g., after OAuth login)
+  useEffect(() => {
+    if (user) {
+      refetch()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   const handleDeleteItem = async (item: string) => {
     try {
       await deleteItem(item)
+      // Immediately refetch to update the UI
+      await refetch()
       toast({
         variant: 'success',
         title: 'Item deleted',
         description: `"${item}" has been removed from your shopping cart.`,
       })
-      // Refresh the cart
-      await refetch()
       // Dispatch event to notify other components
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('shoppingListSaved'))
