@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Stripe from 'stripe'
 
-// Clean and validate Stripe API key - must be called before creating Stripe client
+// Clean and validate Stripe API key
 function cleanStripeKey(rawKey: string): string {
   if (!rawKey) {
     throw new Error('STRIPE_SECRET_KEY is not set')
@@ -32,48 +31,7 @@ function cleanStripeKey(rawKey: string): string {
   return cleanedKey
 }
 
-// Create Stripe client with cleaned key
-// We create it fresh each time to avoid any caching issues
-function getStripeClient(cleanedKey: string): Stripe {
-  // Final validation: ensure key contains ONLY valid characters for HTTP Authorization header
-  // Valid characters: letters, numbers, underscores, hyphens, and the colon (for Basic Auth format)
-  // But Stripe keys don't use colons, so we only allow: a-z, A-Z, 0-9, _, -
-  const validKeyPattern = /^[a-zA-Z0-9_-]+$/
-  if (!validKeyPattern.test(cleanedKey)) {
-    const invalidChars = cleanedKey.split('').filter(c => !/[a-zA-Z0-9_-]/.test(c))
-    throw new Error(`Stripe key contains invalid characters: ${invalidChars.join(', ')}`)
-  }
-  
-  // Log the key format for debugging (safe - only first 12 chars)
-  console.log('Creating Stripe client with key prefix:', cleanedKey.substring(0, 12), 'Length:', cleanedKey.length)
-  
-  // Create Stripe client - explicitly pass the key (don't rely on env var)
-  // The SDK should use the passed key, but we'll also ensure env var is set to cleaned version
-  const originalEnvKey = process.env.STRIPE_SECRET_KEY
-  process.env.STRIPE_SECRET_KEY = cleanedKey
-  
-  try {
-    // Create client with fetch HTTP client for Vercel compatibility
-    const stripe = new Stripe(cleanedKey, {
-      apiVersion: '2025-10-29.clover',
-      timeout: 30000,
-      maxNetworkRetries: 2,
-      httpClient: Stripe.createFetchHttpClient(),
-    })
-    
-    return stripe
-  } catch (error) {
-    console.error('Failed to create Stripe client:', error)
-    throw error
-  } finally {
-    // Restore original env var
-    if (originalEnvKey !== undefined) {
-      process.env.STRIPE_SECRET_KEY = originalEnvKey
-    } else {
-      delete process.env.STRIPE_SECRET_KEY
-    }
-  }
-}
+// We're using fetch API directly, not the Stripe SDK, to avoid HTTP client issues
 
 export async function POST(request: NextRequest) {
   try {
