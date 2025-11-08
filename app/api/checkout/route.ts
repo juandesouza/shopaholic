@@ -1,96 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Clean and validate Stripe API key
-function cleanStripeKey(rawKey: string): string {
+// Validate and clean Stripe API key following Stripe's instructions
+function getStripeSecretKey(): string {
+  // Step 1: Check if environment variable is set
+  const rawKey = process.env.STRIPE_SECRET_KEY
+  
   if (!rawKey) {
-    throw new Error('STRIPE_SECRET_KEY is not set')
+    throw new Error('STRIPE_SECRET_KEY environment variable is not set in Vercel. Please add it in Settings → Environment Variables.')
   }
   
-  // Clean the API key: Stripe keys only contain: letters, numbers, underscores, hyphens
-  // Remove EVERYTHING else (quotes, whitespace, newlines, special chars, etc.)
+  // Step 2: Clean the key - remove any whitespace, quotes, or invalid characters
+  // Stripe keys should only contain: letters, numbers, underscores, hyphens
   let cleanedKey = rawKey
-    .trim()
-    .replace(/^["']+|["']+$/g, '') // Remove surrounding quotes (single or double)
-    .replace(/[\s\r\n\t]/g, '') // Remove ALL whitespace, newlines, carriage returns, tabs
-    .replace(/[^a-zA-Z0-9_-]/g, '') // ONLY keep: letters, numbers, underscores, hyphens
+    .trim() // Remove leading/trailing whitespace
+    .replace(/^["']+|["']+$/g, '') // Remove surrounding quotes
+    .replace(/[\s\r\n\t]/g, '') // Remove all whitespace, newlines, tabs
   
-  // Additional validation
-  if (cleanedKey.length < 20) {
-    throw new Error(`Stripe API key appears to be too short (${cleanedKey.length} chars). Please check your environment variable.`)
-  }
-  
-  // Validate key format
+  // Step 3: Validate key format - must start with sk_test_ or sk_live_
   if (!cleanedKey.startsWith('sk_test_') && !cleanedKey.startsWith('sk_live_')) {
-    console.error('Invalid Stripe key format. Key starts with:', cleanedKey.substring(0, 10))
-    throw new Error('Invalid Stripe API key format. Key must start with sk_test_ or sk_live_')
+    console.error('Invalid Stripe key format. Expected key starting with sk_test_ or sk_live_')
+    console.error('Key prefix received:', cleanedKey.substring(0, 15))
+    throw new Error('Invalid Stripe API key format. The key must start with sk_test_ or sk_live_. Please check your STRIPE_SECRET_KEY in Vercel environment variables.')
   }
   
-  // Log cleaned key info (safe - only first 10 chars)
-  console.log('Cleaned Stripe key prefix:', cleanedKey.substring(0, 10), 'Length:', cleanedKey.length)
+  // Step 4: Validate key contains only valid characters for HTTP headers
+  // Valid characters: a-z, A-Z, 0-9, _, -
+  const validKeyPattern = /^[a-zA-Z0-9_-]+$/
+  if (!validKeyPattern.test(cleanedKey)) {
+    const invalidChars = cleanedKey.split('').filter(c => !/[a-zA-Z0-9_-]/.test(c))
+    console.error('Invalid characters found in Stripe key:', invalidChars.map(c => `'${c}' (code: ${c.charCodeAt(0)})`).join(', '))
+    throw new Error(`STRIPE_SECRET_KEY contains invalid characters that cannot be used in HTTP headers. Please check your Vercel environment variable and ensure it contains only letters, numbers, underscores, and hyphens.`)
+  }
+  
+  // Step 5: Validate key length (Stripe keys are typically 100+ characters)
+  if (cleanedKey.length < 50) {
+    throw new Error(`STRIPE_SECRET_KEY appears to be too short (${cleanedKey.length} characters). Please verify you copied the complete key from Stripe Dashboard.`)
+  }
+  
+  // Log validation success (safe - only first 12 chars)
+  console.log('Stripe key validated successfully. Prefix:', cleanedKey.substring(0, 12), 'Length:', cleanedKey.length)
   
   return cleanedKey
 }
 
-// We're using fetch API directly, not the Stripe SDK, to avoid HTTP client issues
-
 export async function POST(request: NextRequest) {
   try {
-    // Verify Stripe secret key is set
-    if (!process.env.STRIPE_SECRET_KEY) {
-      console.error('STRIPE_SECRET_KEY is not set')
-      return NextResponse.json(
-        { error: 'Stripe configuration error: Secret key is missing' },
-        { status: 500 }
-      )
-    }
-
-    // Get raw key and clean it IMMEDIATELY - before any Stripe code runs
-    const rawKey = process.env.STRIPE_SECRET_KEY || ''
-    
-    // Log raw key info for debugging (safe - only first 10 chars)
-    const hasNewlines = rawKey.includes('\n') || rawKey.includes('\r')
-    const hasQuotes = rawKey.includes('"') || rawKey.includes("'")
-    const hasSpaces = rawKey.includes(' ')
-    const hasInvalidChars = /[^a-zA-Z0-9_-]/.test(rawKey.replace(/^["']+|["']+$/g, '').replace(/[\s\r\n\t]/g, ''))
-    
-    console.log('=== STRIPE KEY DEBUG ===')
-    console.log('Raw key prefix:', rawKey.substring(0, 10))
-    console.log('Raw key length:', rawKey.length)
-    console.log('Has newlines:', hasNewlines)
-    console.log('Has quotes:', hasQuotes)
-    console.log('Has spaces:', hasSpaces)
-    console.log('Has invalid chars:', hasInvalidChars)
-    
-    // Clean and validate the key IMMEDIATELY
-    const cleanedKey = cleanStripeKey(rawKey)
-    console.log('Cleaned key prefix:', cleanedKey.substring(0, 12))
-    console.log('Cleaned key length:', cleanedKey.length)
-    console.log('Cleaned key is valid:', cleanedKey.startsWith('sk_test_') || cleanedKey.startsWith('sk_live_'))
-    
-    // CRITICAL: Override environment variable with cleaned key IMMEDIATELY
-    // This must happen before ANY Stripe SDK code runs
-    process.env.STRIPE_SECRET_KEY = cleanedKey
-    
-    // Additional validation: check for any control characters or invalid HTTP header chars
-    const invalidChars = cleanedKey.match(/[\x00-\x1F\x7F]/)
-    if (invalidChars) {
-      console.error('Found invalid characters in cleaned key:', invalidChars)
-      throw new Error('Cleaned Stripe key contains invalid characters for HTTP headers')
-    }
-    
-    // Verify cleaned key has no invalid characters for HTTP headers
-    const hasInvalidHeaderChars = /[\r\n\t\x00-\x1F\x7F]/.test(cleanedKey)
-    console.log('Cleaned key has invalid header chars:', hasInvalidHeaderChars)
-    console.log('Key character codes (first 20):', Array.from(cleanedKey.substring(0, 20)).map(c => c.charCodeAt(0)).join(','))
-    console.log('Key matches pattern [a-zA-Z0-9_-]+:', /^[a-zA-Z0-9_-]+$/.test(cleanedKey))
-    console.log('========================')
-    
-    if (hasInvalidHeaderChars) {
-      throw new Error('Cleaned Stripe key still contains invalid characters for HTTP headers')
-    }
-    
-    // NOTE: We're using fetch API directly, not Stripe SDK, to avoid HTTP client issues
-    // The Stripe client creation is removed since we make direct API calls
+    // Get and validate Stripe secret key following Stripe's instructions
+    // Reference: https://stripe.com/docs/keys
+    const stripeSecretKey = getStripeSecretKey()
 
     const body = await request.json()
     const { items, currency = 'brl', userId } = body
@@ -133,8 +90,8 @@ export async function POST(request: NextRequest) {
                        `https://${process.env.VERCEL_URL}` : 
                        'https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app'
 
-    // Create Stripe Checkout Session directly using fetch API to avoid SDK HTTP client issues
-    // This ensures we have full control over the Authorization header
+    // Create Stripe Checkout Session using direct API call
+    // Using fetch API to have full control over the Authorization header
     console.log('Creating Stripe checkout session with', lineItems.length, 'items')
     console.log('Origin:', origin)
     
@@ -157,10 +114,11 @@ export async function POST(request: NextRequest) {
     }
     
     // Make direct API call to Stripe using fetch
+    // The Authorization header uses the validated and cleaned key
     const stripeResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${cleanedKey}`, // Use cleaned key directly
+        'Authorization': `Bearer ${stripeSecretKey}`, // Use validated key
         'Content-Type': 'application/x-www-form-urlencoded',
         'Stripe-Version': '2025-10-29.clover',
       },
