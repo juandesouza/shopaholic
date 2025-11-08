@@ -126,7 +126,7 @@ export function Navigation() {
           </div>
         </div>
       </div>
-      {/* Render AuthDialog outside nav but controlled by Navigation state */}
+      {/* Render AuthDialog at root level using portal */}
       <AuthDialog isOpen={authDialogOpen} onClose={() => setAuthDialogOpen(false)} />
     </nav>
   )
