@@ -9,14 +9,14 @@ import { useSaveShoppingList } from '@/app/hooks/use-save-shopping-list'
 import { useShoppingLists } from '@/app/hooks/use-shopping-lists'
 import { useToast } from './ui/use-toast'
 import { useAuth } from '@/app/contexts/AuthContext'
-import { AuthDialog } from './AuthDialog'
+import { useAuthDialog } from '@/app/contexts/AuthDialogContext'
 
 const STORAGE_KEY = 'shopping_list_draft'
 
 export function ShoppingList() {
   const [items, setItems] = useState<string[]>([])
   const [inputValue, setInputValue] = useState('')
-  const [authDialogOpen, setAuthDialogOpen] = useState(false)
+  const { openDialog } = useAuthDialog()
   const [showCharLimitWarning, setShowCharLimitWarning] = useState(false)
   const { saveShoppingList, isSaving } = useSaveShoppingList()
   const { refetch: refetchLists } = useShoppingLists()
@@ -79,7 +79,7 @@ export function ShoppingList() {
 
   const handleInputFocus = () => {
     if (!user && !authLoading) {
-      setAuthDialogOpen(true)
+      openDialog()
       toast({
         variant: 'default',
         title: 'Sign in required',
@@ -154,7 +154,7 @@ export function ShoppingList() {
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
       }
-      setAuthDialogOpen(true)
+      openDialog()
       toast({
         variant: 'default',
         title: 'Sign in required',
@@ -183,7 +183,7 @@ export function ShoppingList() {
       const errorMessage = error instanceof Error ? error.message : 'Failed to save shopping list'
       
       if (errorMessage === 'You have to sign in in order to save a list') {
-        setAuthDialogOpen(true)
+        openDialog()
       }
       
       toast({
@@ -273,7 +273,6 @@ export function ShoppingList() {
           </div>
         </>
       )}
-      <AuthDialog isOpen={authDialogOpen} onClose={() => setAuthDialogOpen(false)} />
     </motion.div>
   )
 }
