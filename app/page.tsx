@@ -1,10 +1,12 @@
 'use client'
 
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { ShoppingList } from './components/ShoppingList'
 import { ShoppingCart } from './components/ShoppingCart'
 import SupabaseStatus from './components/SupabaseStatus'
 import DeleteAccountButton from './components/DeleteAccountButton'
+import { createSupabaseBrowserClient } from './lib/supabase/client'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -29,6 +31,42 @@ const itemVariants = {
 }
 
 export default function Home() {
+  // Handle OAuth callback - ensure session is retrieved after redirect
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const supabase = createSupabaseBrowserClient()
+      
+      // Check for OAuth callback in URL
+      const hash = window.location.hash
+      const searchParams = new URLSearchParams(window.location.search)
+      
+      // If we have OAuth tokens in hash or query params, exchange them for session
+      if (hash || searchParams.has('code') || searchParams.has('access_token')) {
+        try {
+          // Get the session - this will exchange the code/token for a session
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (error) {
+            console.error('Error getting session after OAuth:', error)
+          } else if (session) {
+            console.log('OAuth callback successful, user:', session.user.email)
+            // Clear OAuth parameters from URL
+            if (hash) {
+              window.location.hash = ''
+            }
+            if (searchParams.has('code') || searchParams.has('access_token')) {
+              window.history.replaceState({}, '', window.location.pathname)
+            }
+          }
+        } catch (error) {
+          console.error('Error handling OAuth callback:', error)
+        }
+      }
+    }
+    
+    handleOAuthCallback()
+  }, [])
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <motion.div

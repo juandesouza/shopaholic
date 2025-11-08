@@ -26,12 +26,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session - important for OAuth redirects
     const initializeAuth = async () => {
       try {
+        // First, check if we're returning from OAuth redirect
+        const hash = typeof window !== 'undefined' ? window.location.hash : ''
+        const hasOAuthParams = hash && (hash.includes('access_token') || hash.includes('code'))
+        
+        // Get session - this will also handle OAuth callback exchange
         const { data: { session }, error } = await supabase.auth.getSession()
+        
         if (error) {
           console.error('Error getting session:', error)
         }
-        setUser(session?.user ?? null)
-        setLoading(false)
+        
+        // If we have a session, set it immediately
+        if (session?.user) {
+          console.log('Session found on init:', session.user.email)
+          setUser(session.user)
+        } else {
+          setUser(null)
+        }
+        
+        // If we had OAuth params but no session, wait a bit and try again
+        // Sometimes the exchange takes a moment
+        if (hasOAuthParams && !session) {
+          console.log('OAuth params detected, waiting for session exchange...')
+          setTimeout(async () => {
+            const { data: { session: retrySession } } = await supabase.auth.getSession()
+            if (retrySession?.user) {
+              console.log('Session found on retry:', retrySession.user.email)
+              setUser(retrySession.user)
+            }
+            setLoading(false)
+          }, 1000)
+        } else {
+          setLoading(false)
+        }
       } catch (error) {
         console.error('Error initializing auth:', error)
         setLoading(false)
