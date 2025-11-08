@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session - important for OAuth redirects
     const initializeAuth = async () => {
       try {
-        // Always get session first - this will handle OAuth callbacks automatically
+        // Get session - Supabase will automatically handle OAuth callbacks from URL
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
@@ -41,17 +41,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null)
         }
         
-        // Clear OAuth params from URL if they exist
+        // Only clear OAuth params AFTER Supabase has processed them (after getSession)
+        // Wait a bit to ensure Supabase processed the callback
         if (typeof window !== 'undefined') {
-          const hash = window.location.hash
-          const searchParams = new URLSearchParams(window.location.search)
-          
-          if (hash && (hash.includes('access_token') || hash.includes('code'))) {
-            window.location.hash = ''
-          }
-          if (searchParams.has('code') || searchParams.has('access_token')) {
-            window.history.replaceState({}, '', window.location.pathname)
-          }
+          setTimeout(() => {
+            const hash = window.location.hash
+            const searchParams = new URLSearchParams(window.location.search)
+            
+            if (hash && (hash.includes('access_token') || hash.includes('code'))) {
+              window.location.hash = ''
+            }
+            if (searchParams.has('code') || searchParams.has('access_token')) {
+              window.history.replaceState({}, '', window.location.pathname)
+            }
+          }, 100)
         }
         
         setLoading(false)
