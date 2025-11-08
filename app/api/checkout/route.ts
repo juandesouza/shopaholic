@@ -113,6 +113,26 @@ export async function POST(request: NextRequest) {
       },
     }
     
+    // Final validation: Test that the key can be used in an HTTP Authorization header
+    // This catches any remaining invalid characters before making the request
+    try {
+      // Test header construction - if this throws, the key has invalid characters
+      const testHeader = `Bearer ${stripeSecretKey}`
+      // Check for any characters that would cause ERR_INVALID_CHAR
+      if (/[\r\n\t\x00-\x1F\x7F]/.test(testHeader)) {
+        throw new Error('Stripe key contains invalid characters for HTTP headers')
+      }
+    } catch (headerError) {
+      console.error('Failed to construct Authorization header:', headerError)
+      return NextResponse.json(
+        { 
+          error: 'Invalid Stripe API key format in Vercel environment variable. Please check your STRIPE_SECRET_KEY in Vercel Settings → Environment Variables. The key must contain only letters, numbers, underscores, and hyphens with no spaces, quotes, or special characters.',
+          details: 'The key cannot be used in HTTP headers due to invalid characters.'
+        },
+        { status: 500 }
+      )
+    }
+    
     // Make direct API call to Stripe using fetch
     // The Authorization header uses the validated and cleaned key
     const stripeResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
@@ -184,24 +204,36 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Stripe checkout error:', error)
     
-    // Provide more detailed error messages
+    // Provide detailed error messages following Stripe's troubleshooting guide
     let errorMessage = 'Failed to create checkout session'
+    let errorDetails = ''
+    
     if (error instanceof Error) {
       errorMessage = error.message
-      // Check for specific Stripe errors
-      if (error.message.includes('No such API key')) {
-        errorMessage = 'Stripe API key is invalid. Please check your STRIPE_SECRET_KEY environment variable.'
-      } else if (error.message.includes('Invalid API Key')) {
-        errorMessage = 'Stripe API key is invalid or expired.'
+      
+      // Check for specific error types
+      if (error.message.includes('STRIPE_SECRET_KEY') || error.message.includes('environment variable')) {
+        errorDetails = 'Please check your Vercel Settings → Environment Variables and ensure STRIPE_SECRET_KEY is set correctly. The key should start with sk_test_ or sk_live_ and contain no spaces, quotes, or special characters.'
+      } else if (error.message.includes('Invalid character') || error.message.includes('ERR_INVALID_CHAR')) {
+        errorMessage = 'Invalid Stripe API key format in Vercel environment variable'
+        errorDetails = 'The STRIPE_SECRET_KEY in Vercel contains invalid characters that cannot be used in HTTP headers. Please: 1) Go to Vercel Dashboard → Your Project → Settings → Environment Variables, 2) Delete the existing STRIPE_SECRET_KEY, 3) Add it again by copying the key directly from Stripe Dashboard (https://dashboard.stripe.com/test/apikeys), ensuring no extra spaces or characters are included, 4) Redeploy your project.'
+      } else if (error.message.includes('No such API key') || error.message.includes('Invalid API Key')) {
+        errorMessage = 'Stripe API key is invalid or expired'
+        errorDetails = 'Please verify your STRIPE_SECRET_KEY in Vercel matches the key in your Stripe Dashboard (https://dashboard.stripe.com/test/apikeys). Make sure you\'re using the Secret key (starts with sk_test_), not the Publishable key.'
       } else if (error.message.includes('rate_limit')) {
-        errorMessage = 'Stripe API rate limit exceeded. Please try again in a moment.'
+        errorMessage = 'Stripe API rate limit exceeded'
+        errorDetails = 'Please try again in a moment.'
       } else if (error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
-        errorMessage = 'Unable to connect to Stripe. Please check your internet connection and try again.'
+        errorMessage = 'Unable to connect to Stripe'
+        errorDetails = 'This may be a temporary network issue. Please try again.'
       }
     }
     
     return NextResponse.json(
-      { error: errorMessage },
+      { 
+        error: errorMessage,
+        ...(errorDetails && { details: errorDetails })
+      },
       { status: 500 }
     )
   }
