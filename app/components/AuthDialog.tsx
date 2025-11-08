@@ -6,14 +6,11 @@ import { Mail, Lock, LogIn, UserPlus, X } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { useAuthDialog } from '@/app/contexts/AuthDialogContext'
 import { useToast } from './ui/use-toast'
 
-interface AuthDialogProps {
-  isOpen: boolean
-  onClose: () => void
-}
-
-export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
+export function AuthDialog() {
+  const { isOpen, closeDialog } = useAuthDialog()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -41,7 +38,7 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
           description: 'Welcome back!',
         })
       }
-      onClose()
+      closeDialog()
       setEmail('')
       setPassword('')
     } catch (error) {
@@ -89,9 +86,9 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
   const { user, loading } = useAuth()
   useEffect(() => {
     if (user && !loading && isOpen) {
-      onClose()
+      closeDialog()
     }
-  }, [user, loading, isOpen, onClose])
+  }, [user, loading, isOpen, closeDialog])
 
   if (!isOpen) return null
 
@@ -111,7 +108,7 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              onClose()
+              closeDialog()
             }
           }}
         >
@@ -123,7 +120,7 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
             onClick={(e) => e.stopPropagation()}
           >
           <button
-            onClick={onClose}
+            onClick={closeDialog}
             className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:text-foreground"
             aria-label="Close"
           >

@@ -1,24 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useAuthDialog } from '../contexts/AuthDialogContext'
 import { motion } from 'framer-motion'
 import { Button } from './ui/button'
 import { LogIn, LogOut, User } from 'lucide-react'
-import { AuthDialog } from './AuthDialog'
 
 export function Navigation() {
   const { theme, toggleTheme } = useTheme()
   const { user, loading, signOut } = useAuth()
-  const [authDialogOpen, setAuthDialogOpen] = useState(false)
+  const { isOpen: authDialogOpen, openDialog, closeDialog } = useAuthDialog()
   
   // Close dialog if user becomes authenticated (e.g., after OAuth redirect)
   useEffect(() => {
     if (user && !loading && authDialogOpen) {
-      setAuthDialogOpen(false)
+      closeDialog()
     }
-  }, [user, loading, authDialogOpen])
+  }, [user, loading, authDialogOpen, closeDialog])
   
   // Check for OAuth redirect and close dialog if needed
   useEffect(() => {
@@ -27,10 +27,10 @@ export function Navigation() {
       const hash = window.location.hash
       if (hash && (hash.includes('access_token') || hash.includes('code'))) {
         // OAuth redirect detected - ensure dialog is closed
-        setAuthDialogOpen(false)
+        closeDialog()
       }
     }
-  }, [])
+  }, [closeDialog])
 
   const handleSignOut = async () => {
     try {
@@ -71,7 +71,7 @@ export function Navigation() {
               </div>
             ) : (
               <Button
-                onClick={() => setAuthDialogOpen(true)}
+                onClick={openDialog}
                 variant="outline"
                 size="sm"
                 className="gap-2"
@@ -126,8 +126,6 @@ export function Navigation() {
           </div>
         </div>
       </div>
-      {/* Render AuthDialog at root level using portal */}
-      <AuthDialog isOpen={authDialogOpen} onClose={() => setAuthDialogOpen(false)} />
     </nav>
   )
 }

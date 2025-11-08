@@ -2,9 +2,11 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider } from './contexts/AuthContext'
+import { AuthDialogProvider } from './contexts/AuthDialogContext'
 import { Navigation } from './components/Navigation'
 import { Footer } from './components/Footer'
 import { Toaster } from './components/ui/toaster'
+import { AuthDialog } from './components/AuthDialog'
 import './globals.css'
 
 const inter = Inter({ 
@@ -46,14 +48,17 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider>
           <AuthProvider>
-            <div className="flex min-h-screen flex-col">
-              <Navigation />
-              <main className="flex-1 pt-16">
-                {children}
-              </main>
-              <Footer />
-            </div>
-            <Toaster />
+            <AuthDialogProvider>
+              <div className="flex min-h-screen flex-col">
+                <Navigation />
+                <main className="flex-1 pt-16">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+              <AuthDialog />
+              <Toaster />
+            </AuthDialogProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
