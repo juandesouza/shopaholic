@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { motion } from 'framer-motion'
@@ -10,10 +10,27 @@ import { AuthDialog } from './AuthDialog'
 
 export function Navigation() {
   const { theme, toggleTheme } = useTheme()
-  const { user, signOut } = useAuth()
+  const { user, loading, signOut } = useAuth()
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   
-  // Render AuthDialog at root level using portal-like positioning
+  // Close dialog if user becomes authenticated (e.g., after OAuth redirect)
+  useEffect(() => {
+    if (user && !loading && authDialogOpen) {
+      setAuthDialogOpen(false)
+    }
+  }, [user, loading, authDialogOpen])
+  
+  // Check for OAuth redirect and close dialog if needed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Check if we're returning from OAuth (URL might have hash fragments)
+      const hash = window.location.hash
+      if (hash && (hash.includes('access_token') || hash.includes('code'))) {
+        // OAuth redirect detected - ensure dialog is closed
+        setAuthDialogOpen(false)
+      }
+    }
+  }, [])
 
   const handleSignOut = async () => {
     try {

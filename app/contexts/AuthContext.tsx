@@ -23,20 +23,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createSupabaseBrowserClient()
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    // Get initial session - important for OAuth redirects
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) {
+          console.error('Error getting session:', error)
+        }
+        setUser(session?.user ?? null)
+        setLoading(false)
+      } catch (error) {
+        console.error('Error initializing auth:', error)
+        setLoading(false)
+      }
+    }
+
+    initializeAuth()
 
     // Listen for auth changes (including OAuth redirects)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email)
       setUser(session?.user ?? null)
-      // If user just signed in (e.g., from OAuth redirect), ensure loading is false
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      
+      // Immediately set loading to false on auth events
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
         setLoading(false)
+      }
+      
+      // For OAuth redirects, ensure we have the latest session
+      if (event === 'SIGNED_IN') {
+        try {
+          const { data: { session: latestSession } } = await supabase.auth.getSession()
+          if (latestSession?.user) {
+            setUser(latestSession.user)
+          }
+        } catch (error) {
+          console.error('Error refreshing session after SIGNED_IN:', error)
+        }
       }
     })
 

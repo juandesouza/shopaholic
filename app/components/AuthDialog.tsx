@@ -93,12 +93,32 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
   }, [])
   
   // Close dialog if user becomes authenticated (e.g., after OAuth redirect)
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   useEffect(() => {
-    if (user && isOpen) {
+    // Close immediately when user is authenticated
+    if (user && !loading && isOpen) {
       onClose()
     }
-  }, [user, isOpen, onClose])
+  }, [user, loading, isOpen, onClose])
+  
+  // Check for OAuth redirect in URL and close dialog
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isOpen) {
+      // Check for OAuth redirect parameters
+      const hash = window.location.hash
+      const searchParams = new URLSearchParams(window.location.search)
+      
+      // If we have OAuth tokens in URL, close dialog
+      if (hash && (hash.includes('access_token') || hash.includes('code'))) {
+        onClose()
+      }
+      
+      // Also check query params
+      if (searchParams.has('code') || searchParams.has('access_token')) {
+        onClose()
+      }
+    }
+  }, [isOpen, onClose])
 
   if (!isOpen || !mounted) return null
 
@@ -113,10 +133,13 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
             left: 0,
             right: 0,
             bottom: 0,
+            width: '100vw',
+            height: '100vh',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            padding: '1rem'
           }}
           onClick={(e) => {
             // Close dialog when clicking on backdrop
@@ -130,7 +153,11 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg z-[10000]"
-            style={{ margin: 'auto' }}
+            style={{ 
+              margin: 'auto',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
             onClick={(e) => e.stopPropagation()}
           >
           <button
