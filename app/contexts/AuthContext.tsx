@@ -26,40 +26,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session - important for OAuth redirects
     const initializeAuth = async () => {
       try {
-        // First, check if we're returning from OAuth redirect
+        // Check for OAuth callback in URL hash
         const hash = typeof window !== 'undefined' ? window.location.hash : ''
-        const hasOAuthParams = hash && (hash.includes('access_token') || hash.includes('code'))
+        const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+        const hasOAuthParams = hash && (hash.includes('access_token') || hash.includes('code')) || 
+                              (searchParams && (searchParams.has('code') || searchParams.has('access_token')))
         
-        // Get session - this will also handle OAuth callback exchange
+        // If we have OAuth params, handle the callback first
+        if (hasOAuthParams) {
+          console.log('OAuth callback detected, processing...')
+          // The createBrowserClient should handle this automatically, but let's force it
+          try {
+            // Force session refresh to handle OAuth callback
+            const { data: { session: oauthSession }, error: oauthError } = await supabase.auth.getSession()
+            if (oauthError) {
+              console.error('OAuth callback error:', oauthError)
+            } else if (oauthSession?.user) {
+              console.log('OAuth session found:', oauthSession.user.email)
+              setUser(oauthSession.user)
+              setLoading(false)
+              // Clear OAuth params from URL
+              if (typeof window !== 'undefined') {
+                if (hash) window.location.hash = ''
+                if (searchParams && (searchParams.has('code') || searchParams.has('access_token'))) {
+                  window.history.replaceState({}, '', window.location.pathname)
+                }
+              }
+              return
+            }
+          } catch (error) {
+            console.error('Error processing OAuth callback:', error)
+          }
+        }
+        
+        // Get session normally
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
           console.error('Error getting session:', error)
         }
         
-        // If we have a session, set it immediately
+        // Set user immediately if session exists
         if (session?.user) {
-          console.log('Session found on init:', session.user.email)
+          console.log('Session found:', session.user.email)
           setUser(session.user)
         } else {
           setUser(null)
         }
         
-        // If we had OAuth params but no session, wait a bit and try again
-        // Sometimes the exchange takes a moment
-        if (hasOAuthParams && !session) {
-          console.log('OAuth params detected, waiting for session exchange...')
-          setTimeout(async () => {
-            const { data: { session: retrySession } } = await supabase.auth.getSession()
-            if (retrySession?.user) {
-              console.log('Session found on retry:', retrySession.user.email)
-              setUser(retrySession.user)
-            }
-            setLoading(false)
-          }, 1000)
-        } else {
-          setLoading(false)
-        }
+        setLoading(false)
       } catch (error) {
         console.error('Error initializing auth:', error)
         setLoading(false)
@@ -73,19 +88,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.email)
+      
+      // Immediately update user state
       setUser(session?.user ?? null)
       
-      // Immediately set loading to false on auth events
+      // Set loading to false on auth events
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
         setLoading(false)
       }
       
-      // For OAuth redirects, ensure we have the latest session
+      // For OAuth redirects, force session refresh
       if (event === 'SIGNED_IN') {
         try {
+          // Double-check session is set
           const { data: { session: latestSession } } = await supabase.auth.getSession()
           if (latestSession?.user) {
+            console.log('Confirming SIGNED_IN event, user:', latestSession.user.email)
             setUser(latestSession.user)
+            setLoading(false)
           }
         } catch (error) {
           console.error('Error refreshing session after SIGNED_IN:', error)
