@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, LogIn, UserPlus, X } from 'lucide-react'
 import { Button } from './ui/button'
@@ -85,64 +84,22 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
     }
   }
 
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-    return () => setMounted(false)
-  }, [])
-  
   // Close dialog if user becomes authenticated (e.g., after OAuth redirect)
   const { user, loading } = useAuth()
   useEffect(() => {
-    // Close immediately when user is authenticated
     if (user && !loading && isOpen) {
       onClose()
     }
   }, [user, loading, isOpen, onClose])
-  
-  // Check for OAuth redirect in URL and close dialog
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isOpen) {
-      // Check for OAuth redirect parameters
-      const hash = window.location.hash
-      const searchParams = new URLSearchParams(window.location.search)
-      
-      // If we have OAuth tokens in URL, close dialog
-      if (hash && (hash.includes('access_token') || hash.includes('code'))) {
-        onClose()
-      }
-      
-      // Also check query params
-      if (searchParams.has('code') || searchParams.has('access_token')) {
-        onClose()
-      }
-    }
-  }, [isOpen, onClose])
 
-  if (!isOpen || !mounted) return null
+  if (!isOpen) return null
 
-  const dialogContent = (
+  return (
     <AnimatePresence>
       {isOpen && (
         <div 
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
-          style={{ 
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100vw',
-            height: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflowY: 'auto',
-            padding: '1rem'
-          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={(e) => {
-            // Close dialog when clicking on backdrop
             if (e.target === e.currentTarget) {
               onClose()
             }
@@ -152,12 +109,7 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg z-[10000]"
-            style={{ 
-              margin: 'auto',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}
+            className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
           <button
@@ -272,8 +224,5 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
       )}
     </AnimatePresence>
   )
-
-  // Render dialog using portal to document body to avoid stacking context issues
-  return createPortal(dialogContent, document.body)
 }
 
