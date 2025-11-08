@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, LogIn, UserPlus, X } from 'lucide-react'
 import { Button } from './ui/button'
@@ -86,13 +85,6 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
     }
   }
 
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-    return () => setMounted(false)
-  }, [])
-
   // Close dialog if user becomes authenticated (e.g., after OAuth redirect)
   const { user, loading } = useAuth()
   useEffect(() => {
@@ -101,13 +93,22 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
     }
   }, [user, loading, isOpen, onClose])
 
-  if (!isOpen || !mounted) return null
+  if (!isOpen) return null
 
-  const dialogContent = (
+  return (
     <AnimatePresence>
       {isOpen && (
         <div 
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+          }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               onClose()
@@ -233,7 +234,5 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
       )}
     </AnimatePresence>
   )
-
-  return createPortal(dialogContent, document.body)
 }
 
