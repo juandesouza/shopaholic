@@ -131,8 +131,8 @@ export async function POST(request: NextRequest) {
       throw new Error('Cleaned Stripe key still contains invalid characters for HTTP headers')
     }
     
-    // Now create Stripe client - env var is already set to cleaned key
-    const stripe = getStripeClient(cleanedKey)
+    // NOTE: We're using fetch API directly, not Stripe SDK, to avoid HTTP client issues
+    // The Stripe client creation is removed since we make direct API calls
 
     const body = await request.json()
     const { items, currency = 'brl', userId } = body
