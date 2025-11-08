@@ -18,13 +18,13 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth()
   const { toast } = useToast()
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setIsLoading(true)
 
     try {
       if (isSignUp) {
@@ -52,12 +52,12 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
         description: error instanceof Error ? error.message : 'Authentication failed',
       })
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   const handleGoogleAuth = async () => {
-    setLoading(true)
+    setIsLoading(true)
     try {
       // Close dialog before redirecting (Google OAuth will redirect the page)
       onClose()
@@ -81,7 +81,7 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
         title: 'Error',
         description: errorMessage,
       })
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -209,7 +209,7 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
               </div>
             </div>
 
-            <Button type="submit" className="w-full gap-2" disabled={loading}>
+            <Button type="submit" className="w-full gap-2" disabled={isLoading}>
               {isSignUp ? (
                 <>
                   <UserPlus className="h-4 w-4" />
@@ -234,7 +234,7 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
             onClick={handleGoogleAuth}
             variant="outline"
             className="w-full gap-2"
-            disabled={loading}
+            disabled={isLoading}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path
