@@ -59,10 +59,11 @@ export function AuthDialog({ isOpen, onClose }: AuthDialogProps) {
   const handleGoogleAuth = async () => {
     setIsLoading(true)
     try {
-      // Close dialog before redirecting (Google OAuth will redirect the page)
-      onClose()
+      // Don't close dialog - let OAuth redirect handle it
+      // The dialog will close automatically when user becomes authenticated
       await signInWithGoogle()
       // Note: After Google OAuth, the page will redirect, so we don't need to handle success here
+      // The dialog will be closed by the useEffect that watches for user authentication
     } catch (error) {
       let errorMessage = 'Google sign in failed'
       
