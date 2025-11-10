@@ -96,16 +96,7 @@ export function AuthDialog() {
     <AnimatePresence>
       {isOpen && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100%',
-            height: '100%',
-          }}
+          className="fixed inset-0 z-[100] bg-black/50"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               closeDialog()
@@ -113,10 +104,10 @@ export function AuthDialog() {
           }}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute right-4 top-20 w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
           <button

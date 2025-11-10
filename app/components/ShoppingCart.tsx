@@ -12,7 +12,7 @@ import { getStripe } from '@/app/lib/stripe/client'
 
 export function ShoppingCart() {
   const { user } = useAuth()
-  const { lists, loading, refetch } = useShoppingLists()
+  const { lists, loading, error, refetch } = useShoppingLists()
   const { deleteItem, isDeleting } = useDeleteCartItem()
   const { toast } = useToast()
   const [isCheckingOut, setIsCheckingOut] = useState(false)
@@ -25,6 +25,7 @@ export function ShoppingCart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
+
   // Handle successful payment redirect - clear cart immediately
   useEffect(() => {
     if (typeof window === 'undefined' || !user) return
@@ -36,35 +37,58 @@ export function ShoppingCart() {
       // Clear all shopping lists immediately on client side
       const clearCart = async () => {
         try {
+          console.log('🧹 Clearing cart after successful payment for user:', user.id)
           const { createSupabaseBrowserClient } = await import('@/app/lib/supabase/client')
           const supabase = createSupabaseBrowserClient()
           
-          // Delete all shopping lists for this user
-          const { error: deleteError } = await supabase
-            .from('shopping_lists')
-            .delete()
-            .eq('user_id', user.id)
+          // Use direct fetch to delete all shopping lists for this user
+          const deleteUrl = `${supabase.supabaseUrl}/rest/v1/shopping_lists?user_id=eq.${user.id}`
+          console.log('🗑️ Deleting from:', deleteUrl)
           
-          if (deleteError) {
-            console.error('Error clearing cart:', deleteError)
+          const response = await fetch(deleteUrl, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
+              'Prefer': 'return=representation', // Return deleted rows
+            },
+          })
+          
+          console.log('📥 Delete response:', response.status, response.statusText)
+          
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('❌ Error clearing cart:', errorText)
             toast({
               variant: 'destructive',
               title: 'Error',
               description: 'Failed to clear shopping cart. Please refresh the page.',
             })
-          } else {
-            // Clear URL parameter
-            window.history.replaceState({}, '', window.location.pathname)
-            // Refresh cart to show it's empty
-            await refetch()
-            toast({
-              variant: 'success',
-              title: 'Payment successful!',
-              description: 'Your order has been processed. Shopping cart has been cleared.',
-            })
+            return
           }
+          
+          const deletedData = await response.json()
+          console.log('✅ Deleted shopping lists:', deletedData?.length || 0, 'lists')
+          
+          // Clear URL parameter
+          window.history.replaceState({}, '', window.location.pathname)
+          
+          // Small delay to ensure delete is processed
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+          // Refresh cart to show it's empty
+          console.log('🔄 Refetching lists after cart clear...')
+          await refetch()
+          console.log('✅ Refetch completed - cart should now be empty')
+          
+          toast({
+            variant: 'success',
+            title: 'Payment successful!',
+            description: 'Your order has been processed. Shopping cart has been cleared.',
+          })
         } catch (error) {
-          console.error('Error clearing cart:', error)
+          console.error('❌ Error clearing cart:', error)
           toast({
             variant: 'destructive',
             title: 'Error',
@@ -88,7 +112,8 @@ export function ShoppingCart() {
 
     window.addEventListener('shoppingListSaved', handleListSaved)
     return () => window.removeEventListener('shoppingListSaved', handleListSaved)
-  }, [user, refetch])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]) // Only depend on user, refetch is stable enough via closure
   
   // Also refetch when user changes (e.g., after OAuth login)
   useEffect(() => {
@@ -100,8 +125,9 @@ export function ShoppingCart() {
 
   const handleDeleteItem = async (item: string) => {
     try {
+      // Delete the item first
       await deleteItem(item)
-      // Immediately refetch to update the UI
+      // Immediately refetch to update the UI - this will force a refresh
       await refetch()
       toast({
         variant: 'success',
@@ -113,6 +139,8 @@ export function ShoppingCart() {
         window.dispatchEvent(new CustomEvent('shoppingListSaved'))
       }
     } catch (error) {
+      // On error, refetch to restore correct state
+      await refetch()
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -189,19 +217,53 @@ export function ShoppingCart() {
     return null
   }
 
-  // Don't show anything if there are no lists (whether loading or not)
-  // This prevents the flash when switching tabs
-  if (lists.length === 0) {
-    return null
-  }
-
   // Flatten all items from all lists and check if empty
   const allItems = lists.flatMap((list) => list.items)
   const uniqueItems = Array.from(new Set(allItems))
   
-  // Don't show cart if there are no items
+  // Don't show cart if there are no items (even during loading)
+  // This prevents showing "Loading..." when the cart is empty
   if (uniqueItems.length === 0) {
     return null
+  }
+
+  // Show loading state only if we're loading and have items
+  if (loading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mt-12 rounded-2xl border border-border bg-background p-8 shadow-lg"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <ShoppingCartIcon className="h-6 w-6 text-accent" />
+          <h2 className="text-2xl font-bold text-foreground">Shopping Cart</h2>
+        </div>
+        <p className="py-8 text-center text-muted-foreground">Loading...</p>
+      </motion.div>
+    )
+  }
+
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mt-12 rounded-2xl border border-border bg-background p-8 shadow-lg"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <ShoppingCartIcon className="h-6 w-6 text-accent" />
+          <h2 className="text-2xl font-bold text-foreground">Shopping Cart</h2>
+        </div>
+        <p className="py-8 text-center text-destructive">Error: {error}</p>
+        <Button onClick={() => refetch()} className="w-full mt-4">
+          Retry
+        </Button>
+      </motion.div>
+    )
   }
 
   // Calculate price for an item (1 dollar per letter)
@@ -230,60 +292,52 @@ export function ShoppingCart() {
         </span>
       </div>
 
-      {uniqueItems.length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">
-          No items in your shopping cart yet.
-        </p>
-      ) : (
-        <ul className="space-y-2 w-full lg:w-[70%] lg:mx-auto">
-          <AnimatePresence mode="popLayout">
-            {uniqueItems.map((item, index) => (
-              <motion.li
-                key={`${item}-${index}`}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.2, delay: index * 0.05 }}
-                className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4 transition-colors hover:bg-muted/50"
+      <ul className="space-y-2 w-full lg:w-[70%] lg:mx-auto">
+        <AnimatePresence mode="popLayout">
+          {uniqueItems.map((item, index) => (
+            <motion.li
+              key={`${item}-${index}`}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2, delay: index * 0.05 }}
+              className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-4 transition-colors hover:bg-muted/50"
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <span className="text-sm font-medium text-accent min-w-[2.5rem] text-right">
+                  ${calculatePrice(item)}
+                </span>
+                <span className="text-foreground">{item}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDeleteItem(item)}
+                disabled={isDeleting}
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                aria-label={`Delete ${item}`}
               >
-                <div className="flex items-center gap-3 flex-1">
-                  <span className="text-sm font-medium text-accent min-w-[2.5rem] text-right">
-                    ${calculatePrice(item)}
-                  </span>
-                  <span className="text-foreground">{item}</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDeleteItem(item)}
-                  disabled={isDeleting}
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  aria-label={`Delete ${item}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ul>
-      )}
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
 
-      {uniqueItems.length > 0 && (
-        <div className="mt-6 pt-6 border-t border-border w-full lg:w-[70%] lg:mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-lg font-semibold text-foreground">Total</span>
-            <span className="text-2xl font-bold text-accent">${totalPrice}</span>
-          </div>
-          <Button
-            className="w-full gap-2"
-            size="lg"
-            onClick={handleCheckout}
-            disabled={isCheckingOut || isDeleting}
-          >
-            {isCheckingOut ? 'Processing...' : 'Checkout'}
-          </Button>
+      <div className="mt-6 pt-6 border-t border-border w-full lg:w-[70%] lg:mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-lg font-semibold text-foreground">Total</span>
+          <span className="text-2xl font-bold text-accent">${totalPrice}</span>
         </div>
-      )}
+        <Button
+          className="w-full gap-2"
+          size="lg"
+          onClick={handleCheckout}
+          disabled={isCheckingOut || isDeleting}
+        >
+          {isCheckingOut ? 'Processing...' : 'Checkout'}
+        </Button>
+      </div>
     </motion.div>
   )
 }

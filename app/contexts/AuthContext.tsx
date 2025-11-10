@@ -107,26 +107,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     const supabase = createSupabaseBrowserClient()
-    // Use just the origin (without pathname) for OAuth redirect
-    // This ensures proper redirect after Google authentication
-    const redirectTo = typeof window !== 'undefined' 
-      ? window.location.origin
-      : process.env.NEXT_PUBLIC_APP_URL || 
-        process.env.NEXT_PUBLIC_VERCEL_URL ? 
-          `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` :
-          'https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app'
     
-    const { error } = await supabase.auth.signInWithOAuth({
+    // Determine redirect URL - use just origin (no pathname) for better compatibility
+    let redirectTo: string
+    if (typeof window !== 'undefined') {
+      redirectTo = window.location.origin
+    } else {
+      redirectTo = process.env.NEXT_PUBLIC_APP_URL || 
+        (process.env.NEXT_PUBLIC_VERCEL_URL ? 
+          `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` :
+          'https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app')
+    }
+    
+    console.log('Starting OAuth login, redirectTo:', redirectTo)
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
+        // Remove queryParams that might interfere with Google's 2FA flow
+        // Let Google handle authentication prompts naturally
       },
     })
+    
     if (error) {
+      console.error('OAuth error:', error)
       // Provide more helpful error message for provider not enabled
       if (error.message.includes('provider is not enabled') || 
           error.message.includes('Unsupported provider')) {
@@ -134,6 +139,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       throw error
     }
+    
+    console.log('OAuth redirect initiated:', data?.url)
   }
 
   const signInWithEmail = async (email: string, password: string) => {
@@ -155,9 +162,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    const supabase = createSupabaseBrowserClient()
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    try {
+      const supabase = createSupabaseBrowserClient()
+      
+      // Clear user state first
+      setUser(null)
+      
+      // Sign out from Supabase - try both local and global scope
+      const { error: localError } = await supabase.auth.signOut({ scope: 'local' })
+      if (localError) {
+        console.warn('Local sign out error:', localError)
+      }
+      
+      const { error: globalError } = await supabase.auth.signOut({ scope: 'global' })
+      if (globalError) {
+        console.warn('Global sign out error:', globalError)
+      }
+      
+      // Manually clear all Supabase-related cookies
+      if (typeof window !== 'undefined') {
+        // Clear cookies by setting them to expire
+        const cookies = document.cookie.split(';')
+        const domain = window.location.hostname
+        const path = '/'
+        
+        cookies.forEach(cookie => {
+          const eqPos = cookie.indexOf('=')
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
+          
+          // Clear Supabase auth cookies
+          if (name.includes('supabase') || name.includes('sb-') || name.includes('auth')) {
+            // Try multiple domain/path combinations
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path};`
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain};`
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=.${domain};`
+          }
+        })
+        
+        // Clear localStorage
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (key.includes('supabase') || key.includes('auth') || key.includes('sb-'))) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key))
+        
+        // Clear sessionStorage
+        const sessionKeysToRemove: string[] = []
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i)
+          if (key && (key.includes('supabase') || key.includes('auth') || key.includes('sb-'))) {
+            sessionKeysToRemove.push(key)
+          }
+        }
+        sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key))
+      }
+      
+      // Force a fresh session check
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        console.warn('Session still exists after sign out, forcing clear')
+        // If session still exists, something is wrong - force clear
+        setUser(null)
+      }
+    } catch (error) {
+      console.error('Error in signOut:', error)
+      // Still clear user state even on error
+      setUser(null)
+      throw error
+    }
   }
 
   const deleteAccount = async () => {

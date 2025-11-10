@@ -36,13 +36,17 @@ export default function Home() {
     const handleOAuthCallback = async () => {
       const supabase = createSupabaseBrowserClient()
       
-      // Check for OAuth callback in URL
+      // Check for OAuth callback in URL (both hash and query params for cross-browser compatibility)
       const hash = window.location.hash
       const searchParams = new URLSearchParams(window.location.search)
+      const hasOAuthParams = hash && (hash.includes('access_token') || hash.includes('code')) ||
+                            searchParams.has('code') || searchParams.has('access_token')
       
-      // If we have OAuth tokens in hash or query params, exchange them for session
-      if (hash || searchParams.has('code') || searchParams.has('access_token')) {
+      if (hasOAuthParams) {
         try {
+          // Wait a bit for Supabase to process the callback
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
           // Get the session - this will exchange the code/token for a session
           const { data: { session }, error } = await supabase.auth.getSession()
           
@@ -50,13 +54,14 @@ export default function Home() {
             console.error('Error getting session after OAuth:', error)
           } else if (session) {
             console.log('OAuth callback successful, user:', session.user.email)
-            // Clear OAuth parameters from URL
-            if (hash) {
-              window.location.hash = ''
-            }
-            if (searchParams.has('code') || searchParams.has('access_token')) {
-              window.history.replaceState({}, '', window.location.pathname)
-            }
+          }
+          
+          // Clear OAuth parameters from URL after processing
+          if (hash && (hash.includes('access_token') || hash.includes('code'))) {
+            window.location.hash = ''
+          }
+          if (searchParams.has('code') || searchParams.has('access_token')) {
+            window.history.replaceState({}, '', window.location.pathname)
           }
         } catch (error) {
           console.error('Error handling OAuth callback:', error)
@@ -64,7 +69,11 @@ export default function Home() {
       }
     }
     
+    // Run immediately and also after a short delay for browsers that load slowly
     handleOAuthCallback()
+    const timeoutId = setTimeout(handleOAuthCallback, 500)
+    
+    return () => clearTimeout(timeoutId)
   }, [])
 
   return (

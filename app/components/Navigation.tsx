@@ -35,12 +35,14 @@ export function Navigation() {
   const handleSignOut = async () => {
     try {
       await signOut()
+      // Wait a moment for cookies to clear
+      await new Promise(resolve => setTimeout(resolve, 100))
       // Force page reload to ensure state is cleared
-      window.location.reload()
+      window.location.href = window.location.origin
     } catch (error) {
       console.error('Error signing out:', error)
-      // Still reload even on error to clear any stale state
-      window.location.reload()
+      // Still redirect even on error to clear any stale state
+      window.location.href = window.location.origin
     }
   }
 

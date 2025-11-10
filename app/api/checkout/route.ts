@@ -82,13 +82,37 @@ export async function POST(request: NextRequest) {
     })
 
     // Get the origin from request headers or use environment variable
-    const origin = request.headers.get('origin') || 
-                   request.headers.get('host') ? 
-                     `https://${request.headers.get('host')}` : 
-                     process.env.NEXT_PUBLIC_APP_URL || 
-                     process.env.VERCEL_URL ? 
-                       `https://${process.env.VERCEL_URL}` : 
-                       'https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app'
+    // Determine protocol: use http for localhost, https for production
+    const getOrigin = (): string => {
+      // Check if we have an origin header (includes protocol)
+      const originHeader = request.headers.get('origin')
+      if (originHeader) {
+        return originHeader
+      }
+      
+      // Get host from headers
+      const host = request.headers.get('host')
+      if (host) {
+        // Check if it's localhost or 127.0.0.1 - use http for local development
+        const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1') || host.includes('0.0.0.0')
+        const protocol = isLocalhost ? 'http' : 'https'
+        return `${protocol}://${host}`
+      }
+      
+      // Check environment variables
+      if (process.env.NEXT_PUBLIC_APP_URL) {
+        return process.env.NEXT_PUBLIC_APP_URL
+      }
+      
+      if (process.env.VERCEL_URL) {
+        return `https://${process.env.VERCEL_URL}`
+      }
+      
+      // Fallback to production URL
+      return 'https://shopaholic-mbcjdvn09-juan-de-souzas-projects-51f7e08a.vercel.app'
+    }
+    
+    const origin = getOrigin()
 
     // Create Stripe Checkout Session using direct API call
     // Using fetch API to have full control over the Authorization header

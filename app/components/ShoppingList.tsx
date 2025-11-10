@@ -140,7 +140,10 @@ export function ShoppingList() {
   }
 
   const handleSave = async () => {
+    console.log('🔵 handleSave called', { itemsCount: items.length, user: user?.id, isSaving })
+    
     if (items.length === 0) {
+      console.log('⚠️ Cannot save: items array is empty')
       toast({
         variant: 'default',
         title: 'Cannot save empty list',
@@ -150,6 +153,7 @@ export function ShoppingList() {
     }
 
     if (!user) {
+      console.log('⚠️ Cannot save: no user')
       // Save to localStorage before opening auth dialog
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
@@ -163,8 +167,12 @@ export function ShoppingList() {
       return
     }
 
+    console.log('✅ Starting save process...', { items, userId: user.id })
     try {
+      console.log('📤 Calling saveShoppingList...')
       await saveShoppingList(items)
+      console.log('✅ saveShoppingList completed successfully')
+      console.log('✅ Save successful, showing success toast')
       toast({
         variant: 'success',
         title: 'Success!',
@@ -174,13 +182,18 @@ export function ShoppingList() {
       setItems([])
       clearDraft()
       // Refresh the shopping cart and trigger a custom event for other components
+      console.log('🔄 Refetching lists...')
       await refetchLists()
+      console.log('✅ Lists refetched')
       // Dispatch custom event to notify ShoppingCart to refresh
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('shoppingListSaved'))
       }
+      console.log('✅ Save process complete')
     } catch (error) {
+      console.error('❌ Error in handleSave:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to save shopping list'
+      console.error('❌ Error message:', errorMessage)
       
       if (errorMessage === 'You have to sign in in order to save a list') {
         openDialog()
@@ -263,7 +276,12 @@ export function ShoppingList() {
           </ul>
           <div className="flex justify-end">
             <Button
-              onClick={handleSave}
+              onClick={(e) => {
+                console.log('🔘 Save button clicked', { isSaving, itemsLength: items.length, disabled: isSaving || items.length === 0 })
+                e.preventDefault()
+                e.stopPropagation()
+                handleSave()
+              }}
               disabled={isSaving || items.length === 0}
               className="gap-2"
             >

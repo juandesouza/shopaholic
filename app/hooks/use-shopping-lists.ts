@@ -23,7 +23,7 @@ export function useShoppingLists(): UseShoppingListsReturn {
   const { user } = useAuth()
   const [lastUserId, setLastUserId] = useState<string | null>(null)
 
-  const fetchLists = async () => {
+  const fetchLists = async (force = false) => {
     if (!user) {
       setLists([])
       setLoading(false)
@@ -31,8 +31,8 @@ export function useShoppingLists(): UseShoppingListsReturn {
       return
     }
 
-    // Only fetch if user actually changed
-    if (user.id === lastUserId && lists.length > 0) {
+    // Only skip fetch if user hasn't changed AND we're not forcing a refresh
+    if (!force && user.id === lastUserId && lists.length > 0) {
       return
     }
 
@@ -40,19 +40,44 @@ export function useShoppingLists(): UseShoppingListsReturn {
     setError(null)
 
     try {
+      console.log('🔄 use-shopping-lists: Fetching lists for user:', user.id)
       const supabase = createSupabaseBrowserClient()
 
-      const { data, error: fetchError } = await supabase
-        .from('shopping_lists')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      // Use direct fetch instead of Supabase client to avoid hanging
+      const fetchUrl = `${supabase.supabaseUrl}/rest/v1/shopping_lists?user_id=eq.${user.id}&order=created_at.desc`
+      console.log('📡 Fetching from:', fetchUrl)
+      
+      const response = await fetch(fetchUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
+        },
+      })
 
-      if (fetchError) {
-        throw new Error(fetchError.message)
+      console.log('📥 Fetch response:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Fetch error:', errorText)
+        throw new Error(`Failed to fetch lists: ${response.status} ${response.statusText}`)
       }
 
-      setLists(data || [])
+      const data = await response.json()
+      console.log('✅ Fetched lists:', data.length, 'items')
+
+      // Filter by user_id if user is logged in and user_id column exists
+      let filteredData = data || []
+      if (user && data && data.length > 0 && data[0].hasOwnProperty('user_id')) {
+        filteredData = data.filter((list: any) => 
+          !list.user_id || list.user_id === user.id
+        )
+      }
+
+      console.log('✅ Filtered lists:', filteredData.length, 'items')
+      setLists(filteredData)
+      
       setLastUserId(user.id)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch shopping lists'
@@ -74,7 +99,7 @@ export function useShoppingLists(): UseShoppingListsReturn {
     lists,
     loading,
     error,
-    refetch: fetchLists,
+    refetch: () => fetchLists(true), // Always force refresh when refetch is called
   }
 }
 
