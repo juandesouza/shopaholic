@@ -44,7 +44,11 @@ export function useShoppingLists(): UseShoppingListsReturn {
       const supabase = createSupabaseBrowserClient()
 
       // Use direct fetch instead of Supabase client to avoid hanging
-      const fetchUrl = `${supabase.supabaseUrl}/rest/v1/shopping_lists?user_id=eq.${user.id}&order=created_at.desc`
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      if (!supabaseUrl) {
+        throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+      }
+      const fetchUrl = `${supabaseUrl}/rest/v1/shopping_lists?user_id=eq.${user.id}&order=created_at.desc`
       console.log('📡 Fetching from:', fetchUrl)
       
       const response = await fetch(fetchUrl, {

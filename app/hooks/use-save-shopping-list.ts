@@ -35,8 +35,12 @@ export function useSaveShoppingList(): UseSaveShoppingListReturn {
       })
       const supabase = createSupabaseBrowserClient()
       console.log('✅ Supabase client created')
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      if (!supabaseUrl) {
+        throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+      }
       console.log('🔍 Client info:', {
-        url: supabase.supabaseUrl,
+        url: supabaseUrl,
         hasAuth: !!supabase.auth
       })
 
@@ -51,7 +55,7 @@ export function useSaveShoppingList(): UseSaveShoppingListReturn {
       
       // Use direct fetch instead of Supabase client - the client's insert method seems to hang
       console.log('📤 Making direct HTTP request to Supabase REST API...')
-      console.log('🔗 Supabase URL:', supabase.supabaseUrl)
+      console.log('🔗 Supabase URL:', supabaseUrl)
       
       // Get auth token - try to get it from the client's current session
       // Supabase stores session in localStorage with a specific key format
@@ -78,7 +82,7 @@ export function useSaveShoppingList(): UseSaveShoppingListReturn {
       console.log('🔑 Auth token found:', authToken ? 'Yes' : 'No')
       
       // Make direct fetch request to Supabase REST API
-      const insertUrl = `${supabase.supabaseUrl}/rest/v1/shopping_lists`
+      const insertUrl = `${supabaseUrl}/rest/v1/shopping_lists`
       const insertPayload = {
         items: items,
         user_id: user.id,

@@ -42,7 +42,11 @@ export function ShoppingCart() {
           const supabase = createSupabaseBrowserClient()
           
           // Use direct fetch to delete all shopping lists for this user
-          const deleteUrl = `${supabase.supabaseUrl}/rest/v1/shopping_lists?user_id=eq.${user.id}`
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          if (!supabaseUrl) {
+            throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+          }
+          const deleteUrl = `${supabaseUrl}/rest/v1/shopping_lists?user_id=eq.${user.id}`
           console.log('🗑️ Deleting from:', deleteUrl)
           
           const response = await fetch(deleteUrl, {
